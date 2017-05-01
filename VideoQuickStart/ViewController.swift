@@ -10,13 +10,13 @@ import UIKit
 import TwilioVideo
 
 class ViewController: UIViewController {
-
+    
     // MARK: View Controller Members
     
     // Configure access token manually for testing, if desired! Create one manually in the console
     // at https://www.twilio.com/user/account/video/dev-tools/testing-tools
     var accessToken = "TWILIO_ACCESS_TOKEN"
-  
+    
     // Configure remote URL to fetch token from
     var tokenUrl = "http://localhost:8000/token.php"
     
@@ -32,7 +32,10 @@ class ViewController: UIViewController {
     
     // `TVIVideoView` created from a storyboard
     @IBOutlet weak var previewView: TVIVideoView!
-
+    @IBOutlet weak var previewViewHolder: UIView!
+    
+    @IBOutlet weak var showButtonTapped: UIButton!
+    
     @IBOutlet weak var connectButton: UIButton!
     @IBOutlet weak var disconnectButton: UIButton!
     @IBOutlet weak var messageLabel: UILabel!
@@ -40,11 +43,11 @@ class ViewController: UIViewController {
     @IBOutlet weak var roomLine: UIView!
     @IBOutlet weak var roomLabel: UILabel!
     @IBOutlet weak var micButton: UIButton!
-
+    
     // MARK: UIViewController
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
         if PlatformUtils.isSimulator {
             self.previewView.removeFromSuperview()
         } else {
@@ -54,7 +57,7 @@ class ViewController: UIViewController {
         
         // Disconnect and mic button will be displayed when the Client is connected to a Room.
         self.disconnectButton.isHidden = true
-        self.micButton.isHidden = true
+        self.micButton.isHidden = false
         
         self.roomTextField.delegate = self
         
@@ -71,7 +74,7 @@ class ViewController: UIViewController {
         // `TVIVideoView` supports scaleToFill, scaleAspectFill and scaleAspectFit
         // scaleAspectFit is the default mode when you create `TVIVideoView` programmatically.
         self.remoteView!.contentMode = .scaleAspectFit;
-
+        
         let centerX = NSLayoutConstraint(item: self.remoteView!,
                                          attribute: NSLayoutAttribute.centerX,
                                          relatedBy: NSLayoutRelation.equal,
@@ -105,7 +108,7 @@ class ViewController: UIViewController {
                                         constant: 0);
         self.view.addConstraint(height)
     }
-
+    
     // MARK: IBActions
     @IBAction func connect(sender: AnyObject) {
         // Configure access token either from server or manually.
@@ -149,69 +152,76 @@ class ViewController: UIViewController {
         logMessage(messageText: "Attempting to disconnect from room \(room!.name)")
     }
     
+    //Edited IBActon for demo purpose
     @IBAction func toggleMic(sender: AnyObject) {
-        if (self.localAudioTrack != nil) {
-            self.localAudioTrack?.isEnabled = !(self.localAudioTrack?.isEnabled)!
+        self.localVideoTrack?.isEnabled = self.previewViewHolder.isHidden
+        
+        if(self.previewViewHolder.isHidden) {
+            self.previewView.contentMode = .scaleAspectFill
+            self.previewViewHolder.isHidden = false
             
-            // Update the button title
-            if (self.localAudioTrack?.isEnabled == true) {
-                self.micButton.setTitle("Mute", for: .normal)
-            } else {
-                self.micButton.setTitle("Unmute", for: .normal)
-            }
+            UIView.animate(withDuration: 0.3, animations: {
+                self.previewViewHolder.transform = CGAffineTransform.init(scaleX: 1.0, y: 1.0)
+            }, completion: {(success) in
+                
+            })
         }
+        else {
+            UIView.animate(withDuration: 0.3, animations: {
+                self.previewViewHolder.transform = CGAffineTransform.init(scaleX: 0, y: 0)
+            }, completion: { (success) in
+                
+                self.previewViewHolder.isHidden = true
+            })
+        }
+        
     }
-
+    
     // MARK: Private
     func startPreview() {
         if PlatformUtils.isSimulator {
             return
         }
-
-        // Preview our local camera track in the local video preview view.
+        
         camera = TVICameraCapturer(source: .frontCamera, delegate: self)
         localVideoTrack = TVILocalVideoTrack.init(capturer: camera!)
+        
         if (localVideoTrack == nil) {
             logMessage(messageText: "Failed to create video track")
         } else {
-            // Add renderer to video track for local preview
+            self.previewView.contentMode = .scaleAspectFill
             localVideoTrack!.addRenderer(self.previewView)
-
-            logMessage(messageText: "Video track created")
-
-            // We will flip camera on tap.
-            let tap = UITapGestureRecognizer(target: self, action: #selector(ViewController.flipCamera))
-            self.previewView.addGestureRecognizer(tap)
         }
     }
-
+    
     func flipCamera() {
-        if (self.camera?.source == .frontCamera) {
-            self.camera?.selectSource(.backCameraWide)
-        } else {
-            self.camera?.selectSource(.frontCamera)
-        }
+        
+        //        if (self.camera?.source == .frontCamera) {
+        //            self.camera?.selectSource(.backCameraWide)
+        //        } else {
+        //            self.camera?.selectSource(.frontCamera)
+        //        }
     }
-
+    
     func prepareLocalMedia() {
-
+        
         // We will share local audio and video when we connect to the Room.
-
+        
         // Create an audio track.
         if (localAudioTrack == nil) {
             localAudioTrack = TVILocalAudioTrack.init()
-
+            
             if (localAudioTrack == nil) {
                 logMessage(messageText: "Failed to create audio track")
             }
         }
-
+        
         // Create a video track which captures from the camera.
         if (localVideoTrack == nil) {
             self.startPreview()
         }
     }
-
+    
     // Update our UI based upon if we are in a Room or not
     func showRoomUI(inRoom: Bool) {
         self.connectButton.isHidden = inRoom
@@ -288,7 +298,7 @@ extension ViewController : TVIRoomDelegate {
             self.participant = participant
             self.participant?.delegate = self
         }
-       logMessage(messageText: "Room \(room.name), Participant \(participant.identity) connected")
+        logMessage(messageText: "Room \(room.name), Participant \(participant.identity) connected")
     }
     
     func room(_ room: TVIRoom, participantDidDisconnect participant: TVIParticipant) {
@@ -303,7 +313,7 @@ extension ViewController : TVIRoomDelegate {
 extension ViewController : TVIParticipantDelegate {
     func participant(_ participant: TVIParticipant, addedVideoTrack videoTrack: TVIVideoTrack) {
         logMessage(messageText: "Participant \(participant.identity) added video track")
-
+        
         if (self.participant == participant) {
             setupRemoteVideoView()
             videoTrack.addRenderer(self.remoteView!)
@@ -312,7 +322,7 @@ extension ViewController : TVIParticipantDelegate {
     
     func participant(_ participant: TVIParticipant, removedVideoTrack videoTrack: TVIVideoTrack) {
         logMessage(messageText: "Participant \(participant.identity) removed video track")
-
+        
         if (self.participant == participant) {
             videoTrack.removeRenderer(self.remoteView!)
             self.remoteView?.removeFromSuperview()
@@ -322,7 +332,7 @@ extension ViewController : TVIParticipantDelegate {
     
     func participant(_ participant: TVIParticipant, addedAudioTrack audioTrack: TVIAudioTrack) {
         logMessage(messageText: "Participant \(participant.identity) added audio track")
-
+        
     }
     
     func participant(_ participant: TVIParticipant, removedAudioTrack audioTrack: TVIAudioTrack) {
